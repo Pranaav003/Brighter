@@ -22,6 +22,19 @@ final class DisplayManager: ObservableObject {
 
     private var monitorTimer: Timer?
 
+    /// Cached function pointer for DisplayServicesGetBrightness.
+    private lazy var displayServicesGetBrightness: DisplayServicesGetBrightnessFunc? = {
+        // Load DisplayServices framework dynamically at runtime.
+        // This avoids a hard link-time dependency on the private framework.
+        guard let handle = dlopen("/System/Library/PrivateFrameworks/DisplayServices.framework/DisplayServices", RTLD_LAZY) else {
+            return nil
+        }
+        guard let sym = dlsym(handle, "DisplayServicesGetBrightness") else {
+            return nil
+        }
+        return unsafeBitCast(sym, to: DisplayServicesGetBrightnessFunc.self)
+    }()
+
     init() {
         refreshDisplays()
     }
@@ -56,9 +69,11 @@ final class DisplayManager: ObservableObject {
     func systemBrightness(for displayID: CGDirectDisplayID) -> Double {
         // Use DisplayServices framework (private but stable API)
         var brightness: Float = 0.0
-        let result = DisplayServicesGetBrightness(displayID, &brightness)
-        if result == .success {
-            return Double(brightness)
+        if let getBrightness = displayServicesGetBrightness {
+            let result = getBrightness(displayID, &brightness)
+            if result == .success {
+                return Double(brightness)
+            }
         }
         // Fallback: try IOKit path
         return 1.0
@@ -89,18 +104,24 @@ final class DisplayManager: ObservableObject {
     // MARK: - Private
 
     private func checkHDRCapability(for displayID: CGDirectDisplayID) -> Bool {
-        // Strategy: Check NSScreen EDR value
-        // This is the most reliable method on macOS 13+
+        // Strategy: Check NSScreen EDR value (available macOS 10.15+)
+        // Use performSelector for runtime safety since the property may not
+        // be visible to the compiler in all SDK configurations.
         if let screen = NSScreen.screens.first(where: { $0.displayID == displayID }) {
-            if screen.maximumPotentialEDRValue > 1.0 {
-                return true
+            let edrSel = NSSelectorFromString("maximumPotentialEDRValue")
+            if screen.responds(to: edrSel) {
+                if let edrValue = screen.perform(edrSel)?.takeUnretainedValue() as? NSNumber {
+                    if edrValue.doubleValue > 1.0 {
+                        return true
+                    }
+                }
             }
         }
 
         // Strategy: Check IOKit properties for HDR/EDR support
-        let registryID = CGDisplayUnitNumber(displayID)
-        let servicePort = IOKitGetMatchingService(
-            kIOMasterPortDefault,
+        let registryID = UInt64(CGDisplayUnitNumber(displayID))
+        let servicePort = IOServiceGetMatchingService(
+            kIOMainPortDefault,
             IORegistryEntryIDMatching(registryID)
         )
         defer { IOObjectRelease(servicePort) }
@@ -131,9 +152,9 @@ final class DisplayManager: ObservableObject {
     }
 
     private func getDisplayName(for displayID: CGDirectDisplayID) -> String {
-        let registryID = CGDisplayUnitNumber(displayID)
-        let servicePort = IOKitGetMatchingService(
-            kIOMasterPortDefault,
+        let registryID = UInt64(CGDisplayUnitNumber(displayID))
+        let servicePort = IOServiceGetMatchingService(
+            kIOMainPortDefault,
             IORegistryEntryIDMatching(registryID)
         )
         defer { IOObjectRelease(servicePort) }
@@ -157,9 +178,9 @@ final class DisplayManager: ObservableObject {
     }
 
     private func getPeakLuminance(for displayID: CGDirectDisplayID) -> Double? {
-        let registryID = CGDisplayUnitNumber(displayID)
-        let servicePort = IOKitGetMatchingService(
-            kIOMasterPortDefault,
+        let registryID = UInt64(CGDisplayUnitNumber(displayID))
+        let servicePort = IOServiceGetMatchingService(
+            kIOMainPortDefault,
             IORegistryEntryIDMatching(registryID)
         )
         defer { IOObjectRelease(servicePort) }
@@ -181,12 +202,13 @@ final class DisplayManager: ObservableObject {
 
 // MARK: - DisplayServices Bridge
 
-/// Private DisplayServices framework functions used for brightness control.
-/// These are stable Apple private APIs used by many brightness apps.
-@_silgen_name("DisplayServicesGetBrightness")
-private func DisplayServicesGetBrightness(
-    _ displayID: CGDirectDisplayID,
-    _ brightness: UnsafeMutablePointer<Float>
+/// Type alias for the DisplayServicesGetBrightness function pointer.
+/// DisplayServices is a private framework; we load it dynamically at runtime
+/// to avoid hard link-time dependencies. These are stable Apple private APIs
+/// used by many brightness apps.
+private typealias DisplayServicesGetBrightnessFunc = @convention(c) (
+    CGDirectDisplayID,
+    UnsafeMutablePointer<Float>
 ) -> CGError
 
 /// Convenience extension to get display ID from NSScreen.
