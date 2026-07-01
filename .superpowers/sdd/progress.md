@@ -11,6 +11,6 @@
 - [x] Task 7: KeyMonitor — Brightness Key Interception (commit 3d64d47)
 - [x] Task 8: BrightnessHUD — OSD Overlay (commit fafb93f)
 - [x] Task 9: Menu Bar UI — Slider, View, and Controller (commit a776ac5)
-- [ ] Task 10: AppDelegate & App Wiring
-- [ ] Task 11: Build Verification & Bug Fixes
+- [x] Task 10: AppDelegate & App Wiring (commit 91b2043)
+- [x] Task 11: Build Verification & Bug Fixes (build passes at HEAD)
 - [ ] Task 12: README & Final Polish
