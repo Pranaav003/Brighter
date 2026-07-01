@@ -63,7 +63,7 @@ final class KeyMonitor {
 
         CGEvent.tapEnable(tap: tap, enable: true)
         isRunning = true
-        logger.info("Key monitor started")
+        logger.info("Key monitor started — watching for brightness keys (up=107, down=113)")
     }
 
     /// Stops monitoring brightness key events.
@@ -90,9 +90,14 @@ final class KeyMonitor {
 
     // MARK: - Private
 
-    /// Brightness key codes from the HID Usage Tables (Consumer page).
-    private static let brightnessUpKeyCode: CGKeyCode = 107
-    private static let brightnessDownKeyCode: CGKeyCode = 113
+    /// Brightness key codes (HID Consumer page).
+    /// These are the key codes used by MonitorControl and other brightness apps on macOS.
+    private static let brightnessUpKeyCode: Int64 = 107
+    private static let brightnessDownKeyCode: Int64 = 113
+
+    /// Alternative key codes that some keyboard layouts use.
+    private static let altBrightnessUpKeyCode: Int64 = 145
+    private static let altBrightnessDownKeyCode: Int64 = 144
 
     private func handleEvent(
         proxy: CGEventTapProxy,
@@ -113,27 +118,21 @@ final class KeyMonitor {
 
         let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
 
-        if keyCode == Self.brightnessUpKeyCode {
-            // Ask the engine: should we consume this brightness-up event?
-            // (Only consumed when system brightness is at max and we're boosting)
+        if keyCode == Self.brightnessUpKeyCode || keyCode == Self.altBrightnessUpKeyCode {
+            logger.info("Brightness up key detected (code \(keyCode))")
             let shouldConsume = onBrightnessUp?() ?? false
             if shouldConsume {
-                logger.debug("Brightness up consumed (boost active)")
                 return nil // Consume the event
             }
-            // Not at max — let macOS handle it normally
             return Unmanaged.passUnretained(event)
         }
 
-        if keyCode == Self.brightnessDownKeyCode {
-            // Ask the engine: should we consume this brightness-down event?
-            // (Only consumed when boost is active, to step down through boost levels first)
+        if keyCode == Self.brightnessDownKeyCode || keyCode == Self.altBrightnessDownKeyCode {
+            logger.info("Brightness down key detected (code \(keyCode))")
             let shouldConsume = onBrightnessDown?() ?? false
             if shouldConsume {
-                logger.debug("Brightness down consumed (stepping down boost)")
                 return nil
             }
-            // No boost active — let macOS handle it normally
             return Unmanaged.passUnretained(event)
         }
 

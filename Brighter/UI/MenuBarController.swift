@@ -78,12 +78,12 @@ final class MenuBarController {
     private func toggleBoost() {
         if engine.isBoosted {
             engine.resetBoost()
-            for display in displayManager.hdrDisplays {
+            for display in displayManager.boostableDisplays {
                 engine.resetGammaTable(for: display.displayID)
             }
         } else {
             engine.setBoost(Constants.minBoost + Constants.boostStep)
-            for display in displayManager.hdrDisplays {
+            for display in displayManager.boostableDisplays {
                 engine.applyCurrentBoost(for: display.displayID)
             }
         }
