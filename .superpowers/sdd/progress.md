@@ -8,9 +8,9 @@
 - [x] Task 4: PermissionsHelper Utility (commit 5431aea)
 - [x] Task 5: DisplayManager — HDR Detection & System Brightness (commit 60e716f)
 - [x] Task 6: BrightnessEngine — Core Boost Logic (commit 38ce3e7)
-- [ ] Task 7: KeyMonitor — Brightness Key Interception
-- [ ] Task 8: BrightnessHUD — OSD Overlay
-- [ ] Task 9: Menu Bar UI — Slider, View, and Controller
+- [x] Task 7: KeyMonitor — Brightness Key Interception (commit 3d64d47)
+- [x] Task 8: BrightnessHUD — OSD Overlay (commit fafb93f)
+- [x] Task 9: Menu Bar UI — Slider, View, and Controller (commit a776ac5)
 - [ ] Task 10: AppDelegate & App Wiring
 - [ ] Task 11: Build Verification & Bug Fixes
 - [ ] Task 12: README & Final Polish
