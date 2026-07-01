@@ -16,7 +16,7 @@ let package = Package(
             dependencies: [],
             path: "Brighter",
             resources: [
-                .process("Resources")
+                .copy("Resources")
             ]
         ),
         .testTarget(

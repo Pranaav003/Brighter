@@ -2,7 +2,7 @@
 
 ## Tasks
 
-- [ ] Task 1: Project Scaffolding & Xcode Project
+- [x] Task 1: Project Scaffolding & Xcode Project (commit 395c42b..310a20b, review clean)
 - [ ] Task 2: Models — DisplayInfo & BrightnessState
 - [ ] Task 3: GammaTable Utility
 - [ ] Task 4: PermissionsHelper Utility
