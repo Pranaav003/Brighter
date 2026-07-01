@@ -2,9 +2,9 @@
 
 ## Tasks
 
-- [x] Task 1: Project Scaffolding & Xcode Project (commit 395c42b..310a20b, review clean)
-- [ ] Task 2: Models — DisplayInfo & BrightnessState
-- [ ] Task 3: GammaTable Utility
+- [x] Task 1: Project Scaffolding & Xcode Project (commit 395c42b..310a20b)
+- [x] Task 2: Models — DisplayInfo & BrightnessState (included in fa4202a)
+- [x] Task 3: GammaTable Utility (commit 310a20b..fa4202a)
 - [ ] Task 4: PermissionsHelper Utility
 - [ ] Task 5: DisplayManager — HDR Detection & System Brightness
 - [ ] Task 6: BrightnessEngine — Core Boost Logic
