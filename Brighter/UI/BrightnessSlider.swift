@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// A custom slider that shows the brightness range from 100% to 160%.
+/// A custom slider that shows the brightness range from 100% to 250%.
 struct BrightnessSlider: View {
     @Binding var boostFactor: Double
     let onBoostChange: (Double) -> Void
