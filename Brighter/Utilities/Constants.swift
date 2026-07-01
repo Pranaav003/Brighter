@@ -1,13 +1,13 @@
 import Foundation
 
 enum Constants {
-    /// Maximum boost factor (5.0x = 500% of SDR white, well beyond typical HDR headroom)
-    static let maxBoost: Double = 5.0
+    /// Maximum boost factor (2.0x = 200% of SDR white)
+    static let maxBoost: Double = 2.0
 
     /// Minimum boost factor (1.0 = normal, no boost)
     static let minBoost: Double = 1.0
 
-    /// Step size per brightness key press (gives ~40 steps from 1.0 to 5.0)
+    /// Step size per brightness key press (gives ~10 steps from 1.0 to 2.0)
     static let boostStep: Double = 0.10
 
     /// How long the HUD overlay stays visible (seconds)
@@ -23,7 +23,7 @@ enum Constants {
     static let systemBrightnessBars: Int = 16
 
     /// Number of additional boost bars shown in the HUD
-    static let boostBars: Int = 40
+    static let boostBars: Int = 10
 
     /// UserDefaults keys
     enum Defaults {

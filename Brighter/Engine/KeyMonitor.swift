@@ -4,17 +4,16 @@ import os.log
 
 /// Monitors brightness key events using a CGEventTap.
 ///
-/// Intercepts brightness-up key presses ONLY when the system brightness is already at max
-/// (so we can "keep going higher"). Intercepts brightness-down ONLY when boost is active
-/// (to step down through boost levels first). All other key events pass through untouched.
+/// Modern macOS (especially Apple Silicon) sends brightness keys as "system-defined"
+/// events (type 14), not regular key-down events. This monitor listens for both.
 final class KeyMonitor {
 
     /// Called when brightness-up is pressed at max system brightness.
-    /// Returns whether the event should be consumed (true = we handled it, false = pass through).
+    /// Returns whether the event should be consumed (true = we handled it).
     var onBrightnessUp: (() -> Bool)?
 
     /// Called when brightness-down is pressed while boost may be active.
-    /// Returns whether the event should be consumed (true = we handled it, false = pass through).
+    /// Returns whether the event should be consumed (true = we handled it).
     var onBrightnessDown: (() -> Bool)?
 
     private var eventTap: CFMachPort?
@@ -34,7 +33,13 @@ final class KeyMonitor {
             return
         }
 
-        let eventMask: CGEventMask = (1 << CGEventType.keyDown.rawValue)
+        // Listen for BOTH key-down AND system-defined events.
+        // On Apple Silicon Macs, brightness keys come as system-defined events (type 14),
+        // not as regular key-down events. Key codes 107/113 may not fire at all.
+        let systemDefinedType: UInt32 = 14  // NX_SYSDEFINED
+        let eventMask: CGEventMask =
+            (1 << CGEventType.keyDown.rawValue) |
+            (1 << UInt64(systemDefinedType))
 
         guard let tap = CGEvent.tapCreate(
             tap: .cghidEventTap,
@@ -63,7 +68,7 @@ final class KeyMonitor {
 
         CGEvent.tapEnable(tap: tap, enable: true)
         isRunning = true
-        logger.info("Key monitor started — watching for brightness keys (up=107, down=113)")
+        logger.info("Key monitor started — listening for brightness keys (systemDefined + keyDown)")
     }
 
     /// Stops monitoring brightness key events.
@@ -90,14 +95,15 @@ final class KeyMonitor {
 
     // MARK: - Private
 
-    /// Brightness key codes (HID Consumer page).
-    /// These are the key codes used by MonitorControl and other brightness apps on macOS.
-    private static let brightnessUpKeyCode: Int64 = 107
-    private static let brightnessDownKeyCode: Int64 = 113
+    /// NX_KEYTYPE constants for brightness keys (HID Consumer page).
+    private static let NX_KEYTYPE_BRIGHTNESS_UP: Int64 = 3
+    private static let NX_KEYTYPE_BRIGHTNESS_DOWN: Int64 = 2
 
-    /// Alternative key codes that some keyboard layouts use.
-    private static let altBrightnessUpKeyCode: Int64 = 145
-    private static let altBrightnessDownKeyCode: Int64 = 144
+    /// NX_SUBTYPE for auxiliary control buttons (brightness, volume, etc.).
+    private static let NX_SUBTYPE_AUX_CONTROL_BUTTONS: Int64 = 8
+
+    /// Key-down state flag in system-defined event data.
+    private static let NX_KEYDOWN: Int64 = 0x0A
 
     private func handleEvent(
         proxy: CGEventTapProxy,
@@ -112,28 +118,55 @@ final class KeyMonitor {
             return Unmanaged.passUnretained(event)
         }
 
-        guard type == .keyDown else {
+        // Method 1: System-defined events (how Apple Silicon Macs send brightness keys)
+        // These are NSEvent.systemDefined events (CGEventType raw value 14) that carry
+        // the brightness key info in subtype (field 10) and data1 (field 12).
+        if type.rawValue == 14 {
+            let subtype = event.getIntegerValueField(CGEventField(rawValue: 10)!)
+
+            guard subtype == Self.NX_SUBTYPE_AUX_CONTROL_BUTTONS else {
+                return Unmanaged.passUnretained(event)
+            }
+
+            let data1 = event.getIntegerValueField(CGEventField(rawValue: 12)!)
+            let keyType = (data1 >> 16) & 0xFF
+            let keyState = (data1 >> 8) & 0xFF
+
+            // Only respond to key-down, not key-up
+            guard keyState == Self.NX_KEYDOWN else {
+                return Unmanaged.passUnretained(event)
+            }
+
+            if keyType == Self.NX_KEYTYPE_BRIGHTNESS_UP {
+                logger.info("Brightness UP (systemDefined, keyType=\(keyType))")
+                let shouldConsume = onBrightnessUp?() ?? false
+                return shouldConsume ? nil : Unmanaged.passUnretained(event)
+            }
+
+            if keyType == Self.NX_KEYTYPE_BRIGHTNESS_DOWN {
+                logger.info("Brightness DOWN (systemDefined, keyType=\(keyType))")
+                let shouldConsume = onBrightnessDown?() ?? false
+                return shouldConsume ? nil : Unmanaged.passUnretained(event)
+            }
+
             return Unmanaged.passUnretained(event)
         }
 
-        let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
+        // Method 2: Regular key-down events (fallback for some keyboard configs)
+        if type == .keyDown {
+            let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
 
-        if keyCode == Self.brightnessUpKeyCode || keyCode == Self.altBrightnessUpKeyCode {
-            logger.info("Brightness up key detected (code \(keyCode))")
-            let shouldConsume = onBrightnessUp?() ?? false
-            if shouldConsume {
-                return nil // Consume the event
+            if keyCode == 107 || keyCode == 145 {
+                logger.info("Brightness UP (keyDown, code=\(keyCode))")
+                let shouldConsume = onBrightnessUp?() ?? false
+                return shouldConsume ? nil : Unmanaged.passUnretained(event)
             }
-            return Unmanaged.passUnretained(event)
-        }
 
-        if keyCode == Self.brightnessDownKeyCode || keyCode == Self.altBrightnessDownKeyCode {
-            logger.info("Brightness down key detected (code \(keyCode))")
-            let shouldConsume = onBrightnessDown?() ?? false
-            if shouldConsume {
-                return nil
+            if keyCode == 113 || keyCode == 144 {
+                logger.info("Brightness DOWN (keyDown, code=\(keyCode))")
+                let shouldConsume = onBrightnessDown?() ?? false
+                return shouldConsume ? nil : Unmanaged.passUnretained(event)
             }
-            return Unmanaged.passUnretained(event)
         }
 
         return Unmanaged.passUnretained(event)
