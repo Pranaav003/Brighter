@@ -30,9 +30,6 @@ struct MenuBarView: View {
                     ),
                     onBoostChange: { factor in
                         engine.setBoost(factor)
-                        if let display = displayManager.boostableDisplays.first {
-                            engine.applyCurrentBoost(for: display.displayID)
-                        }
                     }
                 )
 
