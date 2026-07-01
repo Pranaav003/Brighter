@@ -6,15 +6,9 @@ A macOS menu bar app that extends display brightness beyond the system maximum o
 
 ## How It Works
 
-macOS HDR displays have luminance headroom above SDR white (1.0×). Brighter manipulates the display's gamma lookup table via `CGSetDisplayTransferByTable` to push RGB values above 1.0, using a smoothstep curve that concentrates the boost in highlights while keeping shadows and midtones natural. This produces **real physical brightness** — not a contrast shift.
+MacBook Pro and Pro Display XDR screens can produce far more light than the standard brightness slider allows — Apple reserves this extra luminance for HDR content. Brighter unlocks that headroom for the entire display, pushing real physical brightness up to 200% of the normal maximum.
 
-```
-output = input + headroom × smoothstep(input)
-```
-
-- Blacks stay black (output=0 at input=0)
-- Midtones barely change
-- Whites go into HDR headroom (up to 200% of SDR white)
+The display genuinely emits more light (up to ~1600 nits on XDR panels). This is not a contrast or color trick — it's the same technology that makes HDR video look bright, applied to your whole screen.
 
 ## Requirements
 
@@ -41,9 +35,9 @@ cd Brighter
 
 | Component | Responsibility |
 |-----------|---------------|
-| `BrightnessEngine` | Boost state, gamma table application via CoreGraphics |
-| `DisplayManager` | HDR display detection, system brightness reading |
-| `GammaTable` | Pure math — Hermite smoothstep curve (3t²−2t³) |
+| `BrightnessEngine` | Manages boost level and applies it to the display |
+| `DisplayManager` | Detects HDR displays, reads system brightness |
+| `GammaTable` | Math for the brightness curve (natural-looking increase) |
 | `MenuBarController` | Menu bar sun icon with popover slider |
 | `BrightnessHUD` | OSD-style overlay showing boost level |
 
