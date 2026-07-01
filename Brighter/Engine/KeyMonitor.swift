@@ -4,15 +4,17 @@ import os.log
 
 /// Monitors brightness key events using a CGEventTap.
 ///
-/// When the user presses brightness-up at max brightness or brightness-down with boost active,
-/// the monitor intercepts the event and notifies the engine.
+/// Intercepts brightness-up key presses ONLY when the system brightness is already at max
+/// (so we can "keep going higher"). Intercepts brightness-down ONLY when boost is active
+/// (to step down through boost levels first). All other key events pass through untouched.
 final class KeyMonitor {
 
     /// Called when brightness-up is pressed at max system brightness.
-    var onBrightnessUp: (() -> Void)?
+    /// Returns whether the event should be consumed (true = we handled it, false = pass through).
+    var onBrightnessUp: (() -> Bool)?
 
-    /// Called when brightness-down is pressed while boost is active.
-    /// Returns whether the event should be consumed.
+    /// Called when brightness-down is pressed while boost may be active.
+    /// Returns whether the event should be consumed (true = we handled it, false = pass through).
     var onBrightnessDown: (() -> Bool)?
 
     private var eventTap: CFMachPort?
@@ -40,7 +42,7 @@ final class KeyMonitor {
             options: .defaultTap,
             eventsOfInterest: eventMask,
             callback: { proxy, type, event, refcon -> Unmanaged<CGEvent>? in
-                guard let refcon = refcon else { return Unmanaged.passRetained(event) }
+                guard let refcon = refcon else { return Unmanaged.passUnretained(event) }
                 let monitor = Unmanaged<KeyMonitor>.fromOpaque(refcon).takeUnretainedValue()
                 return monitor.handleEvent(proxy: proxy, type: type, event: event)
             },
@@ -97,34 +99,44 @@ final class KeyMonitor {
         type: CGEventType,
         event: CGEvent
     ) -> Unmanaged<CGEvent>? {
+        // Re-enable tap if it was disabled by timeout
         if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
             if let tap = eventTap {
                 CGEvent.tapEnable(tap: tap, enable: true)
             }
-            return Unmanaged.passRetained(event)
+            return Unmanaged.passUnretained(event)
         }
 
         guard type == .keyDown else {
-            return Unmanaged.passRetained(event)
+            return Unmanaged.passUnretained(event)
         }
 
         let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
 
         if keyCode == Self.brightnessUpKeyCode {
-            logger.debug("Brightness up key detected")
-            onBrightnessUp?()
-            return nil // Consume the event
+            // Ask the engine: should we consume this brightness-up event?
+            // (Only consumed when system brightness is at max and we're boosting)
+            let shouldConsume = onBrightnessUp?() ?? false
+            if shouldConsume {
+                logger.debug("Brightness up consumed (boost active)")
+                return nil // Consume the event
+            }
+            // Not at max — let macOS handle it normally
+            return Unmanaged.passUnretained(event)
         }
 
         if keyCode == Self.brightnessDownKeyCode {
-            logger.debug("Brightness down key detected")
+            // Ask the engine: should we consume this brightness-down event?
+            // (Only consumed when boost is active, to step down through boost levels first)
             let shouldConsume = onBrightnessDown?() ?? false
             if shouldConsume {
-                return nil // Consume the event
+                logger.debug("Brightness down consumed (stepping down boost)")
+                return nil
             }
-            return Unmanaged.passRetained(event)
+            // No boost active — let macOS handle it normally
+            return Unmanaged.passUnretained(event)
         }
 
-        return Unmanaged.passRetained(event)
+        return Unmanaged.passUnretained(event)
     }
 }

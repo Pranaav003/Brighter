@@ -43,7 +43,7 @@ final class DisplayManager: ObservableObject {
     func refreshDisplays() {
         var displays: [DisplayInfo] = []
 
-        var onlineDisplayIDs: [CGDirectDisplayID] = []
+        var onlineDisplayIDs = [CGDirectDisplayID](repeating: 0, count: 16)
         var displayCount: UInt32 = 0
         let result = CGGetOnlineDisplayList(16, &onlineDisplayIDs, &displayCount)
 

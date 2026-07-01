@@ -32,7 +32,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         // 2. Wire up KeyMonitor callbacks
         keyMonitor.onBrightnessUp = { [weak self] in
-            self?.handleBrightnessUp()
+            self?.handleBrightnessUp() ?? false
         }
 
         keyMonitor.onBrightnessDown = { [weak self] in
@@ -78,21 +78,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: - Brightness Key Handlers
 
-    private func handleBrightnessUp() {
-        // Apply boost to all HDR displays where system brightness is at max
+    /// Handles brightness-up key press.
+    /// Returns true if the event was consumed (boost was applied), false to pass through to macOS.
+    private func handleBrightnessUp() -> Bool {
+        // Apply boost to HDR displays where system brightness is at max
+        var didBoost = false
         for display in displayManager.hdrDisplays {
             if displayManager.isSystemBrightnessMax(for: display.displayID) {
                 engine.increaseBoost()
                 engine.applyCurrentBoost(for: display.displayID)
+                didBoost = true
             }
         }
 
-        // Show HUD if boost is now active
-        if engine.isBoosted {
+        if didBoost {
             hud.show(boostFactor: engine.boostFactor)
+            return true // Consume the key event
         }
+
+        // System brightness isn't at max — let macOS handle it
+        return false
     }
 
+    /// Handles brightness-down key press.
+    /// Returns true if the event was consumed (boost was decreased), false to pass through.
     private func handleBrightnessDown() -> Bool {
         var anyConsumed = false
 
@@ -103,9 +112,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
 
-        // Show HUD if still boosted
-        if engine.isBoosted {
-            hud.show(boostFactor: engine.boostFactor)
+        if anyConsumed {
+            if engine.isBoosted {
+                hud.show(boostFactor: engine.boostFactor)
+            } else {
+                hud.hide()
+            }
         }
 
         return anyConsumed

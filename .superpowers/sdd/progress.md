@@ -13,4 +13,10 @@
 - [x] Task 9: Menu Bar UI — Slider, View, and Controller (commit a776ac5)
 - [x] Task 10: AppDelegate & App Wiring (commit 91b2043)
 - [x] Task 11: Build Verification & Bug Fixes (build passes at HEAD)
-- [ ] Task 12: README & Final Polish
+- [x] Task 12: README & Final Polish (commit a756df6)
+
+## Final Status: ALL TASKS COMPLETE
+
+Build: ✅ Passes
+Tests: Written (require full Xcode to run)
+Commits: 11 total
